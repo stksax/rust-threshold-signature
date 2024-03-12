@@ -1,2 +1,2 @@
 # rust-threshold-signature
- 
+   threshold-signature is a signature that can adjust the minimum number of the people to vote for a proposal easily, the protocal of the signature is the same as ecdsa, but the private key is the constant of a polynomial````f(x) = private key + a1x + a2x**2 ...````, so we can change the degree of polynomial to limit how many person can recover the private key, and although this person work together to make a signature that contain private key, but each of them doesn't know the acutal private key.
