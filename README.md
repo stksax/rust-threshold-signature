@@ -8,5 +8,6 @@
   using paillier key share, they can make a function ````f(x) = private key + a1x + a2x**2 ...````, and after doing operating of ecc cruve, they will have ````f(x) = pubkey + a1x*G + (a2x**2)*G ...````, then they can calculate pubkey (although they can calculate private key also but they shouldn't)
 
 ## ecdsa
-  1
-  1
+  1  <br>
+  2
+  
