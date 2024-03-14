@@ -1,205 +1,187 @@
-use std::{ops::Mul, process::Termination};
-
+use std::ops::{Add, Mul};
 use halo2_proofs::arithmetic::Field;
+
 use pasta_curves::{group::{cofactor::CofactorCurveAffine, ff::PrimeField, Curve}, pallas};
-mod mta; 
-use mta::*;
-use rand::Rng;
-pub fn generate_random_u128_in_range(min: u128, max: u128) -> u128 {
-    let mut rng = rand::thread_rng();
-    let random_value = rng.gen_range(min..=max);
-    random_value
-}
-//send cipher k
-struct FirstStep{
-    selfk : u128,
-    mta_pub_n : u128,
+//p(i) = u + ir + (ir)**2 + ...
+struct Input {
+    key_share : u128,
+    input_r : u128,
+    output_max : usize,
+    output_min : usize,
 }
 
-impl FirstStep {
-    fn cipher_k(&self) -> u128{
-        let random_r = generate_random_u128_in_range(1, self.mta_pub_n);
-        let encrypt_instance = Encrypt {
-            mta_pub_n: self.mta_pub_n,
-            input_r: random_r,
-            message: self.selfk, 
-        };  
+impl Input{
+    fn output_key_share(&self) -> Vec<u128>{
+        let mut output_key_share = vec![self.key_share; self.output_max];
 
-        let cipher_k = encrypt_instance.encrypt();
-        cipher_k 
+        for i in 0..self.output_max{
+            for j in 0..(self.output_min-1){
+                output_key_share[i] += ((i+1) as u128* self.input_r).pow((j as u32)+1);
+            }
+        }
+        output_key_share
     }
 }
 
-//recive cipherk and generate cipher(k2*r1+c1) and keep -c1 as key
-struct SecondStep{
-    others_mta_pub_n : u128,
-    others_cipher_k : u128,
-    selfr : u128,
+struct Collect_output_key_share {
+    key_share : Vec<u128>,
+    member : u128,
+    self_num : u128,
 }
 
-impl SecondStep {
-    fn cipher_k(&self) -> (u128, u128){
-        // let random_unm = generate_random_u128_in_range(1,  self.mta_pub_n);
-        let random_unm: u128 = generate_random_u128_in_range(1,  1234);
-        let random_unm2 = generate_random_u128_in_range(1,  self.others_mta_pub_n);
-        let encrypt_instance = EncryptAddMut {
-            mta_pub_n : self.others_mta_pub_n,
-            cipher : self.others_cipher_k,
-            add_num : random_unm,
-            mut_num : self.selfr,
-            rand : random_unm2,
-        };
-        let cipher_k2r1 = encrypt_instance.encrypt_mut();
+//member is all the player join the signature
+impl Collect_output_key_share{
+    fn collect(&self) -> pallas::Affine {
+        let mut self_key_share :u128 = 0;
+        let member = self.member;
+        let mut count =0;
+        for i in &self.key_share{
+            count += 1;
+            if count == self.self_num || ((count+member-self.self_num))%member==0{
+                self_key_share += i;
+            }
+            
+        }
+        let key_fq = pallas::Scalar::from_u128(self_key_share);
+        let generator = pallas::Affine::generator();
+        let result = pallas::Affine::mul(generator, key_fq).to_affine();
 
-        let encrypt_instance2 = EncryptAddMut {
-            mta_pub_n : self.others_mta_pub_n,
-            cipher : cipher_k2r1,
-            add_num : random_unm,
-            mut_num : self.selfr,
-            rand : random_unm2,
-        };
-        let cipher_k2r1_plus_c = encrypt_instance2.encrypt_add();
-        let add_num_neg = random_unm;
-        (cipher_k2r1_plus_c,  add_num_neg)
+        result
     }
 }
 
-//decrypt cipher get k1*r2+c2
-struct ThirdStep{
-    input_p : u128,
-    input_q : u128,
-    mta_pub_n : u128,
-    cipher : u128,
+struct Calculate_pub_key{
+    degree : u128,
+    coefficient : Vec<u128>,
+    pub_key : Vec<pallas::Affine>,
 }
 
-impl ThirdStep {
-    fn decrypt_cipher(&self) -> u128{
-        let encrypt_instance = Decrypt {
-            input_p : self.input_p,
-            input_q : self.input_q,
-            mta_pub_n : self.mta_pub_n,
-            cipher : self.cipher,
-        };
-
-        let plain_text = encrypt_instance.decrypt();
-        plain_text
+impl Calculate_pub_key{
+    fn calculate(&self) -> pallas::Affine{
+        let thousandfq = pallas::Scalar::from_u128(1000);
+        let mut num=0;
+        let mut result = pallas::Affine::generator();
+        while num < self.degree {
+            let index: usize = num.try_into().unwrap();
+            let mut iter = 0;
+            let mut ans = self.pub_key[index];
+            for i in self.coefficient.iter(){                
+                if iter != num {
+                    let self_coefficient :u128 = self.coefficient[index];
+                    let mut dev: u128 = 1000;
+                    let mutn = pallas::Scalar::from_u128(i.clone());
+                    ans = pallas::Affine::mul(ans, &mutn).to_affine();
+                    dev  =  dev + i - self_coefficient;
+                    let dev2 = pallas::Scalar::from_u128(dev);
+                    let dev3 = pallas::Scalar::sub(&dev2, &thousandfq);
+                    let dev4 = pallas::Scalar::invert(&dev3).unwrap();
+                    ans = pallas::Affine::mul(ans, dev4).to_affine();
+                }
+                iter+=1;
+            }
+            result = pallas::Affine::add(result, ans).to_affine();
+            num+=1;
+        }   
+        result
     }
 }
 
-struct FourthStep{
-    plain_text : u128,
-    selfk : u128,
-    selfr : u128,
-    add_num_neg : u128,
-}
+// struct Test{
+//     degree : u128,
+//     coefficient : Vec<u128>,
+//     pri_key : Vec<pallas::Scalar>,
+// }
 
-impl FourthStep {
-    fn combine(&self) -> (u128, pallas::Affine){
-        // let selfk = pallas::Scalar::from_u128(self.selfk);
-        // let selfr = pallas::Scalar::from_u128(self.selfr);
-        // let k1r1 = pallas::Scalar::mul(&selfk, &selfr);
-        // let k1r2 = pallas::Scalar::from_u128(self.plain_text);
-        // let k2r1 = self.add_num_neg;
-        // let add1 = pallas::Scalar::add(&k1r1, &k1r2);
-        // let sharding_commitment = pallas::Scalar::add(&add1, &k2r1);
-        // let sharding_commitment = pallas::Scalar::invert(&add2).unwrap();
-        let k1r1 = self.selfk * self.selfr;
-        let sharding_commitment = k1r1 + self.plain_text - self.add_num_neg;
-
-        let affine_generator = pallas::Affine::generator();
-        let selfr = pallas::Scalar::from_u128(self.selfr);
-        let verify_point_ep = pallas::Affine::mul(affine_generator, &selfr);
-        let verify_point = pallas::Point::to_affine(&verify_point_ep);
-
-        (sharding_commitment, verify_point)
-    }
-}
+// impl Test{
+//     fn calculate(&self) -> pallas::Scalar{
+//         let thousandfq = pallas::Scalar::from_u128(1000);
+//         let mut num=0;
+//         let mut result = pallas::Scalar::from_u128(0);
+//         while num < self.degree {
+//             let index: usize = num.try_into().unwrap();
+//             let mut iter = 0;
+//             let mut ans: pasta_curves::Fq = self.pri_key[index];
+//             for i in self.coefficient.iter(){                
+//                 if iter != num {
+//                     let self_coefficient :u128 = self.coefficient[index];
+//                     let mut dev: u128 = 1000;
+//                     let mutn = pallas::Scalar::from_u128(i.clone());
+//                     ans = pallas::Scalar::mul(&ans, &mutn);
+//                     dev  =  dev + i - self_coefficient;
+//                     let dev2 = pallas::Scalar::from_u128(dev);
+//                     let dev3 = pallas::Scalar::sub(&dev2, &thousandfq);
+//                     let dev4 = pallas::Scalar::invert(&dev3).unwrap();
+//                     ans = pallas::Scalar::mul(&ans, &dev4);
+//                 }
+//                 iter+=1;
+//             }
+//             result = pallas::Scalar::add(&result, &ans);
+//             num+=1;
+//         }   
+//         result
+//     }
+// }
 
 fn main() {
-    //k * r should < n , because it will mod n
-    let allice_selfk = 564;
-    let allice_selfr = 345;
-    let allice_mta_pri_p = 3163;
-    let allice_mta_pri_q = 3541;
-    let allice_mta_pub_n = allice_mta_pri_p * allice_mta_pri_q;
-    if (allice_selfk * allice_selfr) >= allice_mta_pub_n {
-        panic!("k * r should < n , because it will mod n");
-    }
-    assert!((allice_selfk*allice_selfr) < allice_mta_pub_n);
-
-    let bob_selfk = 687;
-    let bob_selfr = 466;
-    let bob_mta_pri_p = 3347;
-    let bob_mta_pri_q = 2939;
-    let bob_mta_pub_n = bob_mta_pri_p * bob_mta_pri_q;
-    if (bob_selfk * bob_selfr) >= bob_mta_pub_n {
-        panic!("k * r should < n , because it will mod n");
-    }
-    assert!((bob_selfk*bob_selfr) < bob_mta_pub_n);
-
-
-    let a_step_1 = FirstStep{
-        selfk : allice_selfk,
-        mta_pub_n : allice_mta_pub_n,
+    let input1 = Input{
+        key_share : 123,
+        input_r : 3,
+        output_max : 5,
+        output_min : 3,
     };
-    let cipher_a1 = a_step_1.cipher_k();
+    let result1 = input1.output_key_share();
 
-    let b_step_1 = FirstStep{
-        selfk : bob_selfk,
-        mta_pub_n : bob_mta_pub_n,
+    let input2 = Input{
+        key_share : 456,
+        input_r : 17,
+        output_max : 5,
+        output_min : 3,
     };
-    let cipher_b1 = b_step_1.cipher_k();
+    let result2 = input2.output_key_share();
 
-    let a_step_2 = SecondStep{
-        others_mta_pub_n : bob_mta_pub_n,
-        others_cipher_k : cipher_b1,
-        selfr : allice_selfr,
+    let input3 = Input{
+        key_share : 789,
+        input_r : 21,
+        output_max : 5,
+        output_min : 3,
     };
-    let (cipher_k2r1_plus_c1, neg_c1) = a_step_2.cipher_k();
+    let result3 = input3.output_key_share();
 
-    let b_step_2 = SecondStep{
-        others_mta_pub_n : allice_mta_pub_n,
-        others_cipher_k : cipher_a1,
-        selfr : bob_selfr,
+    let mut user_vec = Vec::new();
+    user_vec.extend(result1);
+    user_vec.extend(result2);
+    user_vec.extend(result3);
+    println!("vec+{:?}",user_vec);
+    let user1 = Collect_output_key_share{
+        key_share : user_vec.clone(),
+        member : 5,
+        self_num : 1,
     };
-    let (cipher_k1r2_plus_c2, neg_c2) = b_step_2.cipher_k();
-
-    let a_step_3 = ThirdStep{
-        input_p : allice_mta_pri_p,
-        input_q : allice_mta_pri_q,
-        mta_pub_n : allice_mta_pub_n,
-        cipher : cipher_k1r2_plus_c2,
+    let user1_pubket_share = user1.collect();
+    
+    let user2 = Collect_output_key_share{
+        key_share : user_vec.clone(),
+        member : 5,
+        self_num : 2,
     };
-    let plain_text_a = a_step_3.decrypt_cipher();
+    let user2_pubket_share = user2.collect();
 
-    let b_step_3 = ThirdStep{
-        input_p : bob_mta_pri_p,
-        input_q : bob_mta_pri_q,
-        mta_pub_n : bob_mta_pub_n,
-        cipher : cipher_k2r1_plus_c1,
+    let user3 = Collect_output_key_share{
+        key_share : user_vec.clone(),
+        member : 5,
+        self_num : 3,
     };
-    let plain_text_b = b_step_3.decrypt_cipher();
+    let user3_pubket_share = user3.collect();
 
-    let a_step_4 = FourthStep{
-        plain_text : plain_text_a,
-        selfk : allice_selfk,
-        selfr : allice_selfr,
-        add_num_neg : neg_c1,
+    let pub_key = Calculate_pub_key {
+        degree : 3,
+        coefficient : [1,2,3].to_vec(),
+        pub_key : [user1_pubket_share, user2_pubket_share, user3_pubket_share].to_vec(),
     };
-    let (sharding_commitment_a, verify_point_a) = a_step_4.combine();
-
-    let b_step_4 = FourthStep{
-        plain_text : plain_text_b,
-        selfk : bob_selfk,
-        selfr : bob_selfr,
-        add_num_neg : neg_c2,
-    };
-    let (sharding_commitment_b, verify_point_b) = b_step_4.combine();
-
-    let v1 = allice_selfk + bob_selfk;
-    let v2 = allice_selfr + bob_selfr;
-    let v3 = v1 * v2;
-    let v4 = sharding_commitment_b + sharding_commitment_a;
-    println!("{:?}",&v3);
-    println!("{:?}",&v4);
+    let result = pub_key.calculate();
+    let check = pallas::Scalar::from_u128(1368);
+    let a = pallas::Affine::generator();
+    let check2 = pallas::Affine::mul(a, check).to_affine();
+    println!("{:?}",check2);
+    println!("{:#?}",result);
 }
