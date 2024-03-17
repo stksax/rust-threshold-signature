@@ -1,6 +1,4 @@
 mod mta; 
-
-
 use mta::*;
 use rand::Rng;
 pub fn generate_random_u128_in_range(min: u128, max: u128) -> u128 {
@@ -46,16 +44,19 @@ struct SecondStep{
     others_mta_pub_n : Vec<u128>,//lens = n
     others_cipher_k : Vec<u128>,//lens = n
     selfw : Vec<u128>,//lens = n
+    selfk : Vec<u128>,//lens = n
 }
-//lens =(n*n, n)
+//lens =(n*n, n*n)
 impl SecondStep {
     fn cipher_k(&self) -> (Vec<u128>, Vec<u128>){
         // let random_unm = generate_random_u128_in_range(1,  self.mta_pub_n);
-        let mut random_num = Vec::new();
+        let mut add_num_neg = Vec::new();
         let mut random_num2 = Vec::new();
-        for i in self.others_mta_pub_n.clone(){
-            random_num.push(generate_random_u128_in_range(1, i));
-            random_num2.push(generate_random_u128_in_range(1, i));
+        for _ in self.others_mta_pub_n.iter(){
+            for ((i, j), k) in self.others_mta_pub_n.iter().zip(&self.selfw).zip(&self.selfk){
+                add_num_neg.push(generate_random_u128_in_range(1, *j * *k));
+                random_num2.push(generate_random_u128_in_range(1, *i));
+            }
         }
         
         let mut iter : usize = 0;
@@ -65,12 +66,13 @@ impl SecondStep {
                 encrypt_instance.push(EncryptAddMut {
                     mta_pub_n : *i,
                     cipher : *j,
-                    add_num : random_num[iter],
+                    add_num : add_num_neg[iter],
                     mut_num : *k,
                     rand : random_num2[iter],
                 });
+                iter+=1;
             }
-            iter+=1;
+            
         }
         
         let mut cipher_k2w1_plus_rand = Vec::new();
@@ -79,7 +81,7 @@ impl SecondStep {
             cipher_k2w1_plus_rand.push(i.mut_and_add());
         }
         
-        (cipher_k2w1_plus_rand,  random_num)
+        (cipher_k2w1_plus_rand,  add_num_neg)
     }
 }
 
@@ -109,7 +111,7 @@ impl ThirdStep {
                 cipher : *i,
             });
             iter+=1;
-            if iter+1 == pri_keyp.len(){
+            if iter == pri_keyp.len(){
                 iter=0;
             }
         }
@@ -118,6 +120,7 @@ impl ThirdStep {
         for i in encrypt_instance{
             plain_text.push(i.decrypt());
         }
+      
         plain_text
     }
 }
@@ -142,24 +145,35 @@ impl FourthStep {
         //k1w1 + plentext - add_num_neg = (k1 + k2 + ....) * (w1 +w2 + ....)
         //mul r
         let mut player = 0;
-        let mut iter = 0;
-        for (i, j) in self.plain_text.iter().zip(&self.add_num_neg){
-            if iter != player{
+        let mut raw = 0;
+        for i in &self.plain_text{
+            if player != raw{
                 sharding_signature[player] += *i;
             }
-            if iter == player{
-                sharding_signature[player] -= *j;
-            }
-            iter+=1;
-            if iter+1 == self.selfk.len(){
-                iter = 0;
-                sharding_signature[player] *= self.r;
-                player+=1;
+            player+=1;
+            if player == self.selfk.len(){
+                player=0;
+                raw+=1;
             }
         }
+
+        player = 0;
+        raw = 0;
+        for j in &self.add_num_neg{
+            if player != raw{
+                sharding_signature[raw] -= *j;
+            }
+            player+=1;
+            if player == self.selfk.len(){
+                player=0;
+                raw+=1;
+            }
+        }
+        
         //mk + rkx
         player = 0;
         for i in &self.selfk{
+            sharding_signature[player] *= self.r;
             sharding_signature[player] += *i * self.message;
             player+=1;
         }
@@ -198,6 +212,7 @@ fn main(){
         others_mta_pub_n : [an, bn, cn].to_vec(),
         others_cipher_k : cipher_k,
         selfw : [aw, bw, cw].to_vec(),
+        selfk : [ak, bk, ck].to_vec(),
     };
 
     //(n*n , n)
@@ -219,8 +234,14 @@ fn main(){
         message : 777,
         r : 333,
     };
-    println!("good");
     let result = step4.combine();
-    println!("good");
+    let mut ans =0;
+    for i in &result{
+        ans+=i;
+    } 
     println!("{:?}",result);
+    println!("{:?}",ans);
+    let check = 777 * (ak + bk + ck) + 333 * (ak + bk + ck) * (aw + bw + cw);
+    println!("{:?}",check);
+    println!("u128 max value: {}", std::u128::MAX);
 }
