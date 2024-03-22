@@ -1,3 +1,21 @@
+use primal::Primes;
+use rand::seq::SliceRandom;
+use rand::Rng;
+
+pub fn rand_prime() -> u128{
+    let rand = generate_random_u128_in_range(1, 15);
+    let a = (1<<16) as u128;
+    let b = (1<<rand) as u128;
+    let prime = a - b + 1;
+    prime
+}
+
+pub fn generate_random_u128_in_range(min: u128, max: u128) -> u128 {
+    let mut rng = rand::thread_rng();
+    let random_value = rng.gen_range(min..=max);
+    random_value
+}
+
 pub fn pow_and_mod(mut base: u128, mut exponent: u128, modulus: u128) -> u128{
     if exponent == 0 {
         return 1;
@@ -54,7 +72,7 @@ pub struct Encrypt {
     pub rand : u128,
     pub message : u128,
 }
-//n < u32 , because mod n**2 = u64, u64*u64<u128
+
 impl Encrypt{
     pub fn encrypt(self) -> u128{
         let x = pow_and_mod(self.rand, self.mta_pub_n, self.mta_pub_n*self.mta_pub_n);
@@ -105,39 +123,3 @@ impl Decrypt{
         plein_text
     }
 }
-
-// fn main(){
-//     let p: u128 = 1847;
-//     let q: u128 = 1721;
-//     let r: u128 = 1899;
-//     let m: u128 = 1901;
-//     let n = p*q;
-
-//     let encrypt = Encrypt{
-//         mta_pub_n : n,
-//         rand : r,
-//         message : m,
-//     };
-//     let cipher = encrypt.encrypt();
-
-//     let reciver = EncryptAddMut{
-//         mta_pub_n : n,
-//         cipher : cipher,
-//         add_num : 1777,
-//         mut_num : 1129,
-//         rand : 35267,
-//     };
-
-//     let new_cipher = reciver.mut_and_add();
-
-//     let decrypt = Decrypt{
-//         pri_p : p,
-//         pri_q : q,
-//         cipher : new_cipher,
-//     };
-//     let plein_text = decrypt.decrypt();
-//     let ans = (plein_text - 1777)%n;
-//     println!("{}",ans);
-//     let ans2 = 1901 * 1129;
-//     println!("{}",ans2);
-// }

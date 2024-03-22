@@ -463,6 +463,8 @@ fn main() {
         r : r3,
     };
 
+    println!("{:?}",r3);
+
     let sharding_signature = make_signature.make_signature();
 
     let mut signature = pallas::Scalar::zero();
@@ -479,7 +481,7 @@ fn main() {
         pub_key : pub_key,
     };
     let prover = MockProver::run(k, &circuit, vec![]).unwrap();
-    // assert_eq!(prover.verify(), Ok(()))
+    assert_eq!(prover.verify(), Ok(()))
     
 }
 //s = k (m + xr)

@@ -1,14 +1,8 @@
 use std::ops::Mul;
 use pasta_curves::{group::{cofactor::CofactorCurveAffine, ff::PrimeField, Curve}, pallas};
-mod mta; 
-use mta::*;
-use rand::Rng;
 
-pub fn generate_random_u128_in_range(min: u128, max: u128) -> u128 {
-    let mut rng = rand::thread_rng();
-    let random_value = rng.gen_range(min..=max);
-    random_value
-}
+use crate::*;
+use myp::{Encrypt,EncryptAddMut,Decrypt};
 
 //send cipher k
 struct FirstStep{
@@ -22,13 +16,19 @@ impl FirstStep {
         let mut iter = 0;
         for i in self.mta_pub_n.clone(){
             random_r.push(generate_random_u128_in_range(1, i));
+            if i > std::u64::MAX as u128{
+                panic!("pub_n should < u64")
+            }
         }
 
         let mut encrypt_instance = Vec::new();
         for (i, j) in self.selfk.iter().zip(&self.mta_pub_n) {
+            if i > j{
+                panic!("pub_n should < u64")
+            }
             encrypt_instance.push(Encrypt {
                 mta_pub_n: *j,
-                input_r: random_r[iter],
+                rand: random_r[iter],
                 message: *i,
             });
             iter+=1;
@@ -109,8 +109,8 @@ impl ThirdStep {
         
         for i in &self.cipher {
             encrypt_instance.push( Decrypt{
-                input_p : pri_keyp[iter],
-                input_q : pri_keyq[iter],
+                pri_p : pri_keyp[iter],
+                pri_q : pri_keyq[iter],
                 cipher : *i,
             });
             iter+=1;
@@ -136,19 +136,24 @@ struct FourthStep{
 }
 
 impl FourthStep {
-    fn combine(&self) -> (Vec<u128>, Vec<pallas::Affine>){
+    fn combine(&self) -> (Vec<pallas::Scalar>, Vec<pallas::Affine>){
         let mut sharding_commitment = Vec::new();
         //k1r1
+        let mut ifq = pallas::Scalar::one();
+        let mut jfq = pallas::Scalar::one();
         for (i ,j) in self.selfk.iter().zip(&self.selfr){
-            sharding_commitment.push(*i * *j);
+            ifq = pallas::Scalar::from_u128(*i);
+            jfq = pallas::Scalar::from_u128(*j);
+            sharding_commitment.push(pallas::Scalar::mul(&ifq, &jfq));
         }
         
         //k1r1 + plentext - add_num_neg = (k1 + k2 + ....) * (w1 +w2 + ....)
         let mut player = 0;
         let mut raw = 0;
         for i in &self.plain_text{
+            ifq = pallas::Scalar::from_u128(*i);
             if player != raw{
-                sharding_commitment[player] += *i;
+                sharding_commitment[player] = pallas::Scalar::add(&sharding_commitment[player], &ifq);
             }
             player+=1;
             if player == self.selfk.len(){
@@ -160,8 +165,9 @@ impl FourthStep {
         player = 0;
         raw = 0;
         for j in &self.add_num_neg{
+            jfq = pallas::Scalar::from_u128(*j);
             if player != raw{
-                sharding_commitment[raw] -= *j;
+                sharding_commitment[raw] = pallas::Scalar::sub(&sharding_commitment[raw], &jfq);
             }
             player+=1;
             if player == self.selfk.len(){
@@ -189,7 +195,7 @@ pub fn make_commitment(
     mta_pub_n_vec : Vec<u128>,
     mta_pri_p_vec : Vec<u128>,
     mta_pri_q_vec : Vec<u128>,
-) -> (Vec<u128>, Vec<pasta_curves::EpAffine>){
+) -> (Vec<pallas::Scalar>, Vec<pasta_curves::EpAffine>){
     //k * r should < n , because it will mod n
     for ((i, j), k) in selfk_vec.iter().zip(&selfr_vec).zip(&mta_pub_n_vec){
         if *i * * j >= *k{
@@ -210,7 +216,7 @@ pub fn make_commitment(
         selfk : selfk_vec.clone(),
     };
     let (cipher_k2r1_plus_c1, neg_num) = step_2.cipher_k();
-
+ 
     let step_3 = ThirdStep{
         input_p : mta_pri_p_vec,
         input_q : mta_pri_q_vec,
@@ -237,8 +243,8 @@ mod tests{
     //k * r should < n , because it will mod n
     let allice_selfk = 564;
     let allice_selfr = 345;
-    let allice_mta_pri_p = 3163;
-    let allice_mta_pri_q = 3541;
+    let allice_mta_pri_p = 37057;
+    let allice_mta_pri_q = 55021;
     let allice_mta_pub_n = allice_mta_pri_p * allice_mta_pri_q;
     if (allice_selfk * allice_selfr) >= allice_mta_pub_n {
         panic!("k * r should < n , because it will mod n");
@@ -247,8 +253,8 @@ mod tests{
 
     let bob_selfk = 687;
     let bob_selfr = 466;
-    let bob_mta_pri_p = 3347;
-    let bob_mta_pri_q = 2939;
+    let bob_mta_pri_p = 45497;
+    let bob_mta_pri_q = 61363;
     let bob_mta_pub_n = bob_mta_pri_p * bob_mta_pri_q;
     if (bob_selfk * bob_selfr) >= bob_mta_pub_n {
         panic!("k * r should < n , because it will mod n");
@@ -257,8 +263,8 @@ mod tests{
 
     let chris_selfk = 745;
     let chris_selfr = 531;
-    let chris_mta_pri_p = 1471;
-    let chris_mta_pri_q = 1777;
+    let chris_mta_pri_p = 58237;
+    let chris_mta_pri_q = 50129;
     let chris_mta_pub_n = chris_mta_pri_p * chris_mta_pri_q;
     if (chris_selfk * chris_selfr) >= chris_mta_pub_n {
         panic!("k * r should < n , because it will mod n");
@@ -283,10 +289,11 @@ mod tests{
     let v1 = allice_selfk + bob_selfk + chris_selfk;
     let v2 = allice_selfr + bob_selfr + chris_selfr;
     let v3 = v1 * v2;
-    let mut v4 = 0;
-    for i in sharding_commitment{
-        v4+=i;
+    let mut v4 = pallas::Scalar::zero();
+    for i in &sharding_commitment{
+        v4 = pallas::Scalar::add(&v4, i);
     }
-    assert_eq!(v3, v4)
+    let v5 = pallas::Scalar::from_u128(v3);
+    assert_eq!(v5, v4)
 }
 }

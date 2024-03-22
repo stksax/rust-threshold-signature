@@ -175,7 +175,6 @@ impl Circuit<pallas::Base> for MyCircuit {
     type Config = EccConfig<TestFixedBases>;
     type FloorPlanner = SimpleFloorPlanner;
 
-   
     fn without_witnesses(&self) -> Self {
         Self::default()
     }
