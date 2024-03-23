@@ -1,0 +1,20 @@
+[package]
+name = "myp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pasta_curves = "0.5.1"
+rand = "0.8.5"
+halo2_gadgets = "0.3.0"
+halo2_proofs = "0.3.0"
+lazy_static = "1.4.0"
+num-integer = "0.1.46"
+primal = "0.3.2"
+num-primes = "0.3.0"
+sha2 = "0.10.8"
+hex-literal = "0.4.1"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
