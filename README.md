@@ -15,3 +15,9 @@
 ## multi parties ecdsa 
    we change the ecdsa commitment from ````(k⁻¹)*G```` to ````((k1 + k2 )*(r1 + r2 ))⁻¹ * (r1 + r2) * G```` , response ````s = k * ( m + xr )```` to ````s = (k1 + k2) * ( m + (x1 + x2) r )```` , so here we can calaulate ````k1 * x2```` with MTA and verify, and why do we use ````((k1 + k2 )*(r1 + r2 ))⁻¹ * (r1 + r2) * G```` rather than  ````(k1 + k2)⁻¹ * G````, because they can calculate  ````∑ki * commitment i```` and it should be equal to ````G```` because ````(k1 + k2) * (k1 + k2)⁻¹ * G == G```` , if this step was wrong they can totaly open the randum num ````ki , ri```` to find who has been hack sence the private key havn't been use yet. But if above all correct but in the final step the ecdsa verify fail, we need to do the singal ecdsa ome by one for detect (src in ````main.rs````), that is a little bit Annoying, so I have the other idea using eddsa. 
   
+## multi parties eddsa
+  since the last step fail we still need to run a singal ecdsa, why we just use eddsa to make this more simple, it just need to run the final step to detect hacker.
+  The detail of math is the following, player has secret ````x```` , chose a randum num ````k````, publish public key ````x*G```` , commitment ````k*G```` , response ````s = k + hash_num * x```` (hash_num comes from message). Verifier can calculate ````commitment + hash_num * pub_key == s * g````, src in ````other_small_project/eddsa.rs````, and a team protocal commitment ````(k1 + k2) * G```` , response ````s = (k1 + k2) + hash_num * (x1 + x2)````, and it's easy to verify in singal eddsa, src in ````other_small_project/group_eddsa.rs````.
+
+## get start
+  run ````cargo test```` for every testing, run ````cargo run```` for the main protocal.
