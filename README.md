@@ -1,6 +1,8 @@
 # rust-threshold-signature
-   threshold-signature is a signature that can adjust the minimum number of the people to vote for a proposal easily, the protocal of the signature is the same as ecdsa, but the private key is the constant of a polynomial````f(x) = private key + a1x + a2x**2 ...````, so we can change the degree of polynomial to limit how many person can recover the private key, and although this person work together to make a signature that contain private key, but each of them doesn't know the acutal private key.
-
+   what we need to do for changing the minimum threshold for a team to make a proposal or vote, threshold-signature can do that easily, you just need to change the public key of the group, and it is reusable if the threshold doesn't change. With this project we can detact who has been hack to send the wrong signature for the protocal, and even doesn't need a merkle tree to proof the member is in the group, next I will explame step by step from making a public key, do some secret exchange for the signature, how we verify the message for secret exchange, and detect who has been hack, and finish the signature.
+   
+## generate public key
+  the team hold a ceremony to generate public key, each of them provide their secret key and a randum number to generate a polynomial, the secret is const and the degree can decide threshold. The detail of math is the following, player i has secret:````si```` randum num:````ai````,
 ## paillier key share
   so, to do this, we need a function that allow two person to generate a key, but both of them doesn't know the key itself, is call multiplication to add. In this situation Allice has a key share A, Bob has B, Allice use paillier encryption (it's likes rsa, but it contain ZK verify) send  ````encryption(A)````, Bob recive the cipher then he mut B to the cipher and also add C to it, then he keep -C as key share and send ````cipher(A*B + C)````to Allice, so after Allice dencrypt the cipher, she got ````A*B + C````, so they can add the key share to get  ````A*B + C +(-C) = A*B````
 
