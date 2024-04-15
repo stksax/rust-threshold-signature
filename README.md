@@ -12,5 +12,6 @@
 ## multiplication to add (MTA)
   player1 has A, player2 has B, if they want to mut them without let other knows their secret, player1 send a cipher ````En(A)```` , player2 do mut and add to it ````En(A*B + C)```` (C is a randum num he chose), then player1 decrypt the cipher so he got ````A*B + C```` , player2 hold ````-C```` , so they add this together to get ````A * B```` , src in ````other_small_project/mta.rs````, and how can we make sure other sends the correct secret, I use zkp in ````paillier_verify.rs````.
 
-## MTA message verify
+## multi parties ecdsa 
+   we change the ecdsa commitment from ````(k⁻¹)*G```` to ````((k1 + k2 )*(r1 + r2 ))⁻¹ * (r1 + r2) * G```` , response ````s = k * ( m + xr )```` to ````s = (k1 + k2) * ( m + (x1 + x2) r )```` , so here we can calaulate ````k1 * x2```` with MTA and verify, and why do we use ````((k1 + k2 )*(r1 + r2 ))⁻¹ * (r1 + r2) * G```` rather than  ````(k1 + k2)⁻¹ * G````, because they can calculate  ````∑ki * commitment i```` and it should be equal to ````G```` because ````(k1 + k2) * (k1 + k2)⁻¹ * G == G```` , if this step was wrong they can totaly open the randum num ````ki , ri```` to find who has been hack sence the private key havn't been use yet. But if above all correct but in the final step the ecdsa verify fail, we need to do the singal ecdsa ome by one for detect (src in ````main.rs````), that is a little bit Annoying, so I have the other idea using eddsa. 
   
