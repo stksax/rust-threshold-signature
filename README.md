@@ -10,9 +10,7 @@
   The detail of math is the following, player has secret ````x```` , chose a randum num ````k````, publish public key ````x*G```` , commitment ````(k⁻¹)*G```` , response ````s = k * ( m + xr )```` (r is x coordinate of elliptic curve point commitment, m is message). Verifier can calculate ````s⁻¹(m*g) + s⁻¹(r*pub_key) === commitment````, src in ````other_small_project/ecdsa.rs````.
 
 ## multiplication to add (MTA)
-  player1 has A, player2 has B, if they want to mut them without let other knows their secret, player1 send a cipher ````En(A)```` , player2 do mut and add to it ````En(A*B + C)```` (C is a randum num he chose), then player1 decrypt the cipher so he got ````A*B + C```` , player2 hold ````-C```` , so they add this together to get ````A * B```` , src in ````other_small_project/mta.rs````
+  player1 has A, player2 has B, if they want to mut them without let other knows their secret, player1 send a cipher ````En(A)```` , player2 do mut and add to it ````En(A*B + C)```` (C is a randum num he chose), then player1 decrypt the cipher so he got ````A*B + C```` , player2 hold ````-C```` , so they add this together to get ````A * B```` , src in ````other_small_project/mta.rs````, and how can we make sure other sends the correct secret, I use zkp in ````paillier_verify.rs````.
 
-## ecdsa
-  1  <br>
-  2
+## MTA message verify
   
