@@ -277,50 +277,50 @@ impl Circuit<pallas::Base> for MyCircuit {
         
         let p1 = Point::new(
             chip.clone(), 
-            layouter.namespace(|| "1"),
+            layouter.namespace(|| "m * s_inv * G"),
             Value::known(scalar1),
         )?;
     
         let pub_key = NonIdentityPoint::new(
             chip.clone(), 
-            layouter.namespace(|| "2"),
+            layouter.namespace(|| "public key"),
             Value::known(self.pub_key),
         )?;
 
         let commitment =  Point::new(
             chip.clone(), 
-            layouter.namespace(|| "3"),
+            layouter.namespace(|| "k_inv * G"),
             Value::known(self.commitment),
         )?;
      
         let s_r_inv = pallas::Scalar::mul(&s_inv, &self.input_r);
         let s_r_inv_fp = pallas::Base::from_repr(s_r_inv.to_repr()).unwrap();
         let base = chip.load_private(
-            layouter.namespace(|| "4"), 
+            layouter.namespace(|| "r * s_inv"), 
             column, 
             Value::known(s_r_inv_fp),
         )?;
         let scalar2 = ScalarVar::from_base(
             chip.clone(), 
-            layouter.namespace(|| "1"), 
+            layouter.namespace(|| "r * s_inv"), 
             &base,
         )?;
 
         let (p2,_) = NonIdentityPoint::mul(
             &pub_key, 
-            layouter.namespace(|| "1"), 
+            layouter.namespace(|| "r * s_inv * G"), 
             scalar2,
         )?;
 
         let p3 = Point::add(
             &p1, 
-            layouter.namespace(|| "1"), 
+            layouter.namespace(|| "s_inv * (m + xr) * G"), 
             &p2,
         )?;
 
         let result = Point::constrain_equal(
             &commitment, 
-            layouter.namespace(|| "1"), 
+            layouter.namespace(|| "s_inv * (m + xr) * G == k_inv * G"), 
             &p3,
         );
 
