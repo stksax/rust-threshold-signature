@@ -27,6 +27,7 @@ mod make_commitment;
 use make_commitment::*;
 mod make_signature;
 use make_signature::*;
+mod group_eddsa;
 
 use halo2_gadgets::ecc::{
     chip::{
