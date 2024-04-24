@@ -286,38 +286,38 @@ impl Circuit<pallas::Base> for MyCircuit {
 
         let pub_key = NonIdentityPoint::new(
             chip.clone(), 
-            layouter.namespace(|| "P1"), 
+            layouter.namespace(|| "public key"), 
             Value::known(self.pub_key),
         )?;
 
         let fp = pallas::Base::from_repr(self.e.to_repr()).unwrap();
         let base = chip.load_private(
-            layouter.namespace(|| "P2"), 
+            layouter.namespace(|| "e"), 
             column, 
             Value::known(fp),
         )?;
 
         let scalar = ScalarVar::from_base(
             chip.clone(), 
-            layouter.namespace(|| "ScalarVar from_base"), 
+            layouter.namespace(|| "e as scalar"), 
             &base,
         )?;
 
         let (epub,_) = NonIdentityPoint::mul(
             &pub_key, 
-            layouter.namespace(|| "P4"), 
+            layouter.namespace(|| "e * pub key"), 
             scalar,
         )?;
 
         let p3 = Point::new(
             chip.clone(), 
-            layouter.namespace(|| "P5"), 
+            layouter.namespace(|| "k * G"), 
             Value::known(self.commitment),
         )?;
 
         let p5 = Point::add(
             &p3, 
-            layouter.namespace(|| "P5"), 
+            layouter.namespace(|| "(k * G) + (e * pubkey)"), 
             &epub,
         )?;
 
@@ -325,21 +325,15 @@ impl Circuit<pallas::Base> for MyCircuit {
         let s = pallas::Affine::mul(affine_generator, self.s).to_affine();
         let p4 =  Point::new(
             chip.clone(), 
-            layouter.namespace(|| "P5"), 
+            layouter.namespace(|| "(k + e * pri key) * G"), 
             Value::known(s),
         )?;
-       
+        
         let result = Point::constrain_equal(
             &p4, 
-            layouter.namespace(|| "ww"), 
+            layouter.namespace(|| "(k + e * pri key) * G == (k * G) + (e * pubkey)"), 
             &p5,
         );
-        let a1 = p5.extract_p();
-        let a11 = a1.inner().value();
-        let a2 = &p4.extract_p();
-        let a22 = a2.inner().value();
-        println!("{:?}",a11);
-        println!("{:?}",a22);
         result
     }
     
