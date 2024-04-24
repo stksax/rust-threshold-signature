@@ -28,6 +28,7 @@ use make_commitment::*;
 mod make_signature;
 use make_signature::*;
 mod group_eddsa;
+mod paillier_verify;
 
 use halo2_gadgets::ecc::{
     chip::{
