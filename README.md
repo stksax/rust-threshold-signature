@@ -17,7 +17,7 @@
   
 ## multi parties eddsa
   since the last step fail we still need to run a singal ecdsa, why we just use eddsa to make this more simple, it just need to run the final step to detect hacker.
-  The detail of math is the following, player has secret ````x```` , chose a randum num ````k````, publish public key ````x*G```` , commitment ````k*G```` , response ````s = k + hash_num * x```` (hash_num comes from message). Verifier can calculate ````commitment + hash_num * pub_key == s * g````, src in ````other_small_project/eddsa.rs````, and a team protocal commitment ````(k1 + k2) * G```` , response ````s = (k1 + k2) + hash_num * (x1 + x2)````, and it's easy to verify in singal eddsa, src in ````other_small_project/group_eddsa.rs````.
+  The detail of math is the following, player has secret ````x```` , chose a randum num ````k````, publish public key ````x*G```` , commitment ````k*G```` , response ````s = k + hash_num * x```` (hash_num comes from message). Verifier can calculate ````commitment + hash_num * pub_key == s * g````, src in ````other_small_project/eddsa.rs````, and a team protocal commitment ````(k1 + k2) * G```` , response ````s = (k1 + k2) + hash_num * (x1 + x2)````, and it's easy to verify in singal eddsa, src in ````group_eddsa.rs````.
 
 ## get start
   run ````cargo test```` for every testing, run ````cargo run```` for the main protocal.
